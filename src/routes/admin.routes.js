@@ -10,7 +10,7 @@ router.get("/dashboard", async (_req, res) => {
     select
       (select count(*)::int from applies) as total_applies,
       (select count(*)::int from applies where created_at >= date_trunc('day', now())) as applies_today,
-      (select count(*)::int from interviews where due_date >= current_date and due_date < current_date + interval '7 days') as interviews_this_week,
+      (select count(*)::int from interviews where due_date >= date_trunc('week', now()) and due_date < date_trunc('week', now()) + interval '7 day') as interviews_this_week,
       (select count(*)::int from users u where u.role = 'bidder' and exists (
         select 1 from work_sessions ws where ws.user_id = u.id and ws.end_time is null
       )) as online_bidders
@@ -40,7 +40,7 @@ router.get("/dashboard", async (_req, res) => {
   res.json({
     cards: cards.rows[0],
     profile_stats: profileStats.rows,
-    bidders: bidders.rows
+    bidders: bidders.rows,
   });
 });
 
@@ -58,13 +58,19 @@ router.get("/bidders", async (_req, res) => {
 
 router.put("/bidders/:id/approval", async (req, res) => {
   const approved = Boolean(req.body.approved);
-  const result = await pool.query("update users set approved = $1 where id = $2 returning *", [approved, req.params.id]);
+  const result = await pool.query(
+    "update users set approved = $1 where id = $2 returning *",
+    [approved, req.params.id],
+  );
   res.json({ bidder: result.rows[0] });
 });
 
 router.put("/bidders/:id/active", async (req, res) => {
   const isActive = Boolean(req.body.is_active);
-  const result = await pool.query("update users set is_active = $1 where id = $2 returning *", [isActive, req.params.id]);
+  const result = await pool.query(
+    "update users set is_active = $1 where id = $2 returning *",
+    [isActive, req.params.id],
+  );
   res.json({ bidder: result.rows[0] });
 });
 
@@ -81,23 +87,62 @@ router.get("/profiles", async (_req, res) => {
 });
 
 router.post("/profiles", async (req, res) => {
-  const { name, email, linkedin_url, birthday, location, phone_number, assigned_user_id } = req.body;
-  const result = await pool.query(`
+  const {
+    name,
+    email,
+    linkedin_url,
+    birthday,
+    location,
+    phone_number,
+    assigned_user_id,
+  } = req.body;
+  const result = await pool.query(
+    `
     insert into profiles (name, email, linkedin_url, birthday, location, phone_number, assigned_user_id)
     values ($1, $2, $3, $4, $5, $6, $7)
     returning *
-  `, [name, email || null, linkedin_url || null, birthday || null, location || null, phone_number || null, assigned_user_id || null]);
+  `,
+    [
+      name,
+      email || null,
+      linkedin_url || null,
+      birthday || null,
+      location || null,
+      phone_number || null,
+      assigned_user_id || null,
+    ],
+  );
   res.status(201).json({ profile: result.rows[0] });
 });
 
 router.put("/profiles/:id", async (req, res) => {
-  const { name, email, linkedin_url, birthday, location, phone_number, assigned_user_id } = req.body;
-  const result = await pool.query(`
+  const {
+    name,
+    email,
+    linkedin_url,
+    birthday,
+    location,
+    phone_number,
+    assigned_user_id,
+  } = req.body;
+  const result = await pool.query(
+    `
     update profiles
     set name = $1, email = $2, linkedin_url = $3, birthday = $4, location = $5, phone_number = $6, assigned_user_id = $7
     where id = $8
     returning *
-  `, [name, email || null, linkedin_url || null, birthday || null, location || null, phone_number || null, assigned_user_id || null, req.params.id]);
+  `,
+    [
+      name,
+      email || null,
+      linkedin_url || null,
+      birthday || null,
+      location || null,
+      phone_number || null,
+      assigned_user_id || null,
+      req.params.id,
+    ],
+  );
   res.json({ profile: result.rows[0] });
 });
 
@@ -136,23 +181,62 @@ router.get("/interviews", async (_req, res) => {
 });
 
 router.post("/interviews", async (req, res) => {
-  const { profile_id, company, tech_stacks, processes, current_step, additional_info, due_date } = req.body;
-  const result = await pool.query(`
+  const {
+    profile_id,
+    company,
+    tech_stacks,
+    processes,
+    current_step,
+    additional_info,
+    due_date,
+  } = req.body;
+  const result = await pool.query(
+    `
     insert into interviews (profile_id, company, tech_stacks, processes, current_step, additional_info, due_date)
     values ($1, $2, $3, $4, $5, $6, $7)
     returning *
-  `, [profile_id, company, tech_stacks || [], processes || [], current_step || null, additional_info || null, due_date || null]);
+  `,
+    [
+      profile_id,
+      company,
+      tech_stacks || [],
+      processes || [],
+      current_step || null,
+      additional_info || null,
+      due_date || null,
+    ],
+  );
   res.status(201).json({ interview: result.rows[0] });
 });
 
 router.put("/interviews/:id", async (req, res) => {
-  const { profile_id, company, tech_stacks, processes, current_step, additional_info, due_date } = req.body;
-  const result = await pool.query(`
+  const {
+    profile_id,
+    company,
+    tech_stacks,
+    processes,
+    current_step,
+    additional_info,
+    due_date,
+  } = req.body;
+  const result = await pool.query(
+    `
     update interviews
     set profile_id = $1, company = $2, tech_stacks = $3, processes = $4, current_step = $5, additional_info = $6, due_date = $7
     where id = $8
     returning *
-  `, [profile_id, company, tech_stacks || [], processes || [], current_step || null, additional_info || null, due_date || null, req.params.id]);
+  `,
+    [
+      profile_id,
+      company,
+      tech_stacks || [],
+      processes || [],
+      current_step || null,
+      additional_info || null,
+      due_date || null,
+      req.params.id,
+    ],
+  );
   res.json({ interview: result.rows[0] });
 });
 
