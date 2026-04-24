@@ -59,6 +59,10 @@ router.get("/profiles", async (req, res) => {
 router.get("/profiles/:profileId/apply-data", async (req, res) => {
   const { profileId } = req.params;
   const q = `%${String(req.query.q || "").trim()}%`;
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 100;
+  const offset = (page - 1) * limit;
+
   const allowed = await pool.query(
     "select * from profiles where id = $1 and assigned_user_id = $2",
     [profileId, req.user.id],
@@ -73,9 +77,21 @@ router.get("/profiles/:profileId/apply-data", async (req, res) => {
     where profile_id = $1
       and ($2 = '%%' or company_name ilike $2 or job_title ilike $2 or job_site_url ilike $2)
     order by created_at desc
+    limit $3 offset $4
+  `,
+    [profileId, q, limit, offset],
+  );
+
+  const totalResult = await pool.query(
+    `
+    select count(*)::int as total from applies
+    where profile_id = $1
+      and ($2 = '%%' or company_name ilike $2 or job_title ilike $2 or job_site_url ilike $2)
   `,
     [profileId, q],
   );
+  const total = totalResult.rows[0].total;
+  const totalPages = Math.ceil(total / limit);
 
   const stats = await pool.query(
     `
@@ -107,6 +123,14 @@ router.get("/profiles/:profileId/apply-data", async (req, res) => {
       this_week_interviews: interviews.rowCount,
     },
     interviews: interviews.rows,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages,
+      hasPrev: page > 1,
+      hasNext: page < totalPages,
+    },
   });
 });
 
