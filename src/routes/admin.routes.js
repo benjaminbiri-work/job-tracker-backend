@@ -245,4 +245,52 @@ router.delete("/interviews/:id", async (req, res) => {
   res.json({ ok: true });
 });
 
+router.delete("/bidders/:id", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // prevent deleting yourself
+    if (req.user.id === id) {
+      return res.status(400).json({
+        message: "You cannot delete your own account."
+      });
+    }
+
+    // optional: unassign profiles first
+    await pool.query(
+      `
+      update profiles
+      set assigned_user_id = null
+      where assigned_user_id = $1
+      `,
+      [id]
+    );
+
+    const result = await pool.query(
+      `
+      delete from users
+      where id = $1
+      returning id, name, email
+      `,
+      [id]
+    );
+
+    if (!result.rows[0]) {
+      return res.status(404).json({
+        message: "User not found."
+      });
+    }
+
+    res.json({
+      message: "Bidder deleted successfully.",
+      user: result.rows[0]
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      message: "Failed to delete bidder."
+    });
+  }
+});
+
 export default router;
