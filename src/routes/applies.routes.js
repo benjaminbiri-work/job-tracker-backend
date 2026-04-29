@@ -423,4 +423,59 @@ router.get("/profile/:profileId", requireAuth, async (req, res) => {
   }
 });
 
+router.get("/check-company/:profileId", requireAuth, async (req, res) => {
+  try {
+    const { profileId } = req.params;
+    const company = String(req.query.company || "").trim();
+
+    if (!company) {
+      return res.status(400).json({
+        message: "Company name required."
+      });
+    }
+
+    // bidder can only access own profile
+    if (req.user.role === "bidder") {
+      const allowed = await pool.query(
+        `
+        select id
+        from profiles
+        where id = $1
+        and assigned_user_id = $2
+        limit 1
+        `,
+        [profileId, req.user.id]
+      );
+
+      if (!allowed.rows[0]) {
+        return res.status(403).json({
+          message: "Profile not assigned to you."
+        });
+      }
+    }
+
+    const result = await pool.query(
+      `
+      select id, company_name, job_title, created_at
+      from applies
+      where profile_id = $1
+      and company_name ilike $2
+      order by created_at desc
+      limit 10
+      `,
+      [profileId, `%${company}%`]
+    );
+
+    res.json({
+      total: result.rows.length,
+      items: result.rows
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      message: "Failed to check company."
+    });
+  }
+});
+
 export default router;
